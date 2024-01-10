@@ -110,6 +110,6 @@ class HeroWxPage extends StatelessWidget {
 }
 ```
 
-## Tanks
+## Thanks
 
-Tank you https://github.com/EchoPuda/wx_video_player.git.
+Thank you `EchoPuda` https://github.com/EchoPuda/wx_video_player.git.

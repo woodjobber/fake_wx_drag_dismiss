@@ -1,7 +1,7 @@
 name: fake_wx_drag_dismiss
 description: Imitation of WeChat Moments to view video interaction.
 version: 0.0.1
-homepage:
+homepage: https://github.com/woodjobber/fake_wx_drag_dismiss.git
 
 environment:
   sdk: '>=3.0.2 <4.0.0'

@@ -1,3 +1,6 @@
+## 0.0.5
+* Fix:
+  1. Fix bugs,for pageView.
 ## 0.0.4
 * Fix:
   1. Support PageView , at top auto dismiss.

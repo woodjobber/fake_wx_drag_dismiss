@@ -1,1 +1,1 @@
-const Duration defaultDuration = Duration(milliseconds: 500);
+const Duration defaultDuration = Duration(milliseconds: 350);

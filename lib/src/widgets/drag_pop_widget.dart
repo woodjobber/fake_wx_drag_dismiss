@@ -1,11 +1,11 @@
 // ignore_for_file: prefer_typing_uninitialized_variables
 
+import '../../fake_wx_drag_dismiss.dart';
+import '../core/drag_dismiss_mixin.dart';
 import 'package:flutter/rendering.dart';
 
-import '../../fake_wx_drag_dismiss.dart';
 import '../animation_controllers/drag_fade_animation_controller.dart';
 import '../animation_controllers/drag_normal_animation_controller.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/drag_notification.dart';
@@ -19,6 +19,7 @@ class DragPopWidget extends StatefulWidget {
     this.onDragEnd,
     this.onPanUpdate,
     this.onAnimationFinish,
+    this.dragDismissWithNoScaleAnimationAtTopEdge = false,
     required this.animationController,
     required this.fadeAnimationController,
   }) : super(key: key);
@@ -30,7 +31,7 @@ class DragPopWidget extends StatefulWidget {
   final Function()? onAnimationFinish;
   final AnimationController animationController;
   final AnimationController fadeAnimationController;
-  // final ChangeNotifier manualClosingNotifier;
+  final bool dragDismissWithNoScaleAnimationAtTopEdge;
   @override
   DragPopWidgetState createState() => DragPopWidgetState();
 
@@ -38,7 +39,7 @@ class DragPopWidget extends StatefulWidget {
 }
 
 class DragPopWidgetState extends State<DragPopWidget>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, DragDismissMixin {
   final ValueNotifier<double> _scaleNotifier = ValueNotifier<double>(1.0);
   final ValueNotifier<Offset> _offsetNotifier =
       ValueNotifier<Offset>(Offset.zero);
@@ -54,6 +55,12 @@ class DragPopWidgetState extends State<DragPopWidget>
 
   late var statusListener;
   late var valueListener;
+
+  bool isClosing = false;
+
+  bool atTopEdge = false;
+  ScrollDirection direction = ScrollDirection.idle;
+  Offset moveDelta = Offset.zero;
 
   @override
   void initState() {
@@ -90,13 +97,11 @@ class DragPopWidgetState extends State<DragPopWidget>
     widget.animationController.addStatusListener(statusListener);
     widget.animationController.addListener(valueListener);
     DragDismissController.instance.addListener(closing);
+    moveController = widget.animationController;
   }
 
   @override
   void dispose() {
-    if (kDebugMode) {
-      print("DragPopWidget dispose...");
-    }
     _resetController.dispose();
     widget.animationController.removeStatusListener(statusListener);
     widget.animationController.removeListener(valueListener);
@@ -111,9 +116,10 @@ class DragPopWidgetState extends State<DragPopWidget>
     widget.onDragStart?.call();
   }
 
-  void onPanUpdate(DragUpdateDetails details) {
-    _offsetNotifier.value += details.delta;
-    widget.onPanUpdate?.call(details.delta);
+  void onPanUpdate(Offset delta) {
+    // if (isActive) return;
+    _offsetNotifier.value += delta;
+    widget.onPanUpdate?.call(delta);
     if (isChildBelowMid(_offsetNotifier.value.dy)) {
       // dy : sy = x : 1 - min
       _scaleNotifier.value =
@@ -125,15 +131,14 @@ class DragPopWidgetState extends State<DragPopWidget>
         widget.animationController.value = 1;
       }
     }
-
-    if (details.delta.dy > 0) {
+    if (delta.dy > 0.15) {
       _isBottomDir = true;
     } else {
       _isBottomDir = false;
     }
   }
 
-  void onPanEnd(DragEndDetails details) {
+  void onPanEnd() {
     if (isChildBelowMid(_offsetNotifier.value.dy - 100)) {
       if (_isBottomDir) {
         closing();
@@ -160,53 +165,104 @@ class DragPopWidgetState extends State<DragPopWidget>
   }
 
   void closing() {
+    if (isClosing) {
+      return;
+    }
+    isClosing = true;
     widget.animationController.removeListener(valueListener);
     widget.onClosing?.call();
   }
 
-  bool atTopEdge = false;
-  ScrollDirection direction = ScrollDirection.idle;
+  void _onPointerDown(PointerDownEvent event) {
+    activePointerCount++;
+  }
+
+  void _onPointerUp(_) {
+    activePointerCount--;
+    if (dragUnderway && activePointerCount == 0) {
+      onPanEnd();
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    moveDelta = event.delta;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return NotificationListener(
-      onNotification: (notification) {
-        if (notification is DragStartNotification) {
-          onPanStart(notification.details);
-        } else if (notification is DragUpdateNotification) {
-          onPanUpdate(notification.details);
-        } else if (notification is DragEndNotification) {
-          onPanEnd(notification.details);
-        } else if (notification is DragCancelNotification) {
-          onPanCancel();
-        } else if (notification is UserScrollNotification && atTopEdge) {
-          direction = notification.direction;
-          if (direction == ScrollDirection.forward) {
-            if (atTopEdge) closing();
+    return Listener(
+      onPointerDown: _onPointerDown,
+      onPointerCancel: _onPointerUp,
+      onPointerUp: _onPointerUp,
+      onPointerMove: _onPointerMove,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification is UserScrollNotification && atTopEdge) {
+            direction = notification.direction;
           }
-        } else if (notification is ScrollStartNotification) {
-          atTopEdge = notification.metrics.pixels ==
-              notification.metrics.minScrollExtent;
-        }
-        return false;
-      },
-      child: ValueListenableBuilder<Offset>(
-        valueListenable: _offsetNotifier,
-        builder: (context, offset, child) {
-          return Transform.translate(
-            offset: offset,
-            child: ValueListenableBuilder<double>(
-              valueListenable: _scaleNotifier,
-              builder: (context, scale, child) {
-                return Transform.scale(
-                  scale: scale,
-                  child: RepaintBoundary(
-                    child: widget.child,
-                  ),
-                );
-              },
-            ),
-          );
+          if (notification is ScrollStartNotification) {
+            atTopEdge = notification.metrics.pixels ==
+                notification.metrics.minScrollExtent;
+          }
+          if (notification is ScrollUpdateNotification &&
+              atTopEdge &&
+              direction == ScrollDirection.forward) {
+            if (direction == ScrollDirection.forward) {
+              if (atTopEdge &&
+                  widget.dragDismissWithNoScaleAnimationAtTopEdge &&
+                  moveDelta.dx.abs() < 0.3 &&
+                  moveDelta.dy.abs() > 0.7) {
+                closing();
+              }
+            }
+            if (notification.dragDetails != null) {
+              dragUnderway = true;
+              DragUpdateDetails details = notification.dragDetails!;
+              onPanUpdate(Offset(moveDelta.dx, details.delta.dy));
+            } else {
+              dragUnderway = false;
+              onPanEnd();
+            }
+          }
+
+          return false;
         },
+        child: NotificationListener(
+          onNotification: (notification) {
+            if (notification is DragStartNotification) {
+              dragUnderway = true;
+              onPanStart(notification.details);
+            } else if (notification is DragUpdateNotification) {
+              onPanUpdate(notification.details.delta);
+            } else if (notification is DragEndNotification) {
+              dragUnderway = false;
+              onPanEnd();
+            } else if (notification is DragCancelNotification) {
+              dragUnderway = false;
+              onPanCancel();
+            }
+            return false;
+          },
+          child: ValueListenableBuilder<Offset>(
+            valueListenable: _offsetNotifier,
+            builder: (context, offset, child) {
+              return Transform.translate(
+                offset: offset,
+                child: ValueListenableBuilder<double>(
+                  valueListenable: _scaleNotifier,
+                  builder: (context, scale, child) {
+                    return Transform.scale(
+                      scale: scale,
+                      child: RepaintBoundary(
+                        child: widget.child,
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }

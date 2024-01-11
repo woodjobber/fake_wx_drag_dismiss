@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 import '../core/drag_pop_gesture.dart';
 import '../animation_controllers/drag_fade_animation_controller.dart';
 import '../animation_controllers/drag_normal_animation_controller.dart';
@@ -13,9 +11,14 @@ class DragTransitionPage extends StatefulWidget {
     super.key,
     required this.builder,
     this.hero = true,
+    this.dragDismissWithNoScaleAnimationAtTopEdge = false,
   });
   final WidgetBuilder builder;
   final bool hero;
+
+  /// 针对 PageView,在顶部，直接关闭，没有缩放效果
+  ///
+  final bool dragDismissWithNoScaleAnimationAtTopEdge;
   @override
   State<DragTransitionPage> createState() => _DragTransitionPageState();
 }
@@ -40,6 +43,8 @@ class _DragTransitionPageState extends State<DragTransitionPage>
   @override
   Widget build(BuildContext context) {
     return DragPopWidget(
+      dragDismissWithNoScaleAnimationAtTopEdge:
+          widget.dragDismissWithNoScaleAnimationAtTopEdge,
       animationController: normalAnimationController,
       fadeAnimationController: fadeAnimationController,
       onClosing: () {
@@ -63,17 +68,10 @@ class _DragTransitionPageState extends State<DragTransitionPage>
       onPanUpdate: (delta) {
         DragDismissManager.sendDragUpdate(delta);
       },
+      // child: builder(context),
       child: DragPopGesture(
         child: builder(context),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    if (kDebugMode) {
-      print("DragTransitionPage dispose...");
-    }
-    super.dispose();
   }
 }

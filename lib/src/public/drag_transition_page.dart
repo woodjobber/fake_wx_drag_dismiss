@@ -60,6 +60,9 @@ class _DragTransitionPageState extends State<DragTransitionPage>
       onAnimationFinish: () {
         DragDismissManager.sendAnimationFinish();
       },
+      onPanUpdate: (delta) {
+        DragDismissManager.sendDragUpdate(delta);
+      },
       child: DragPopGesture(
         child: builder(context),
       ),

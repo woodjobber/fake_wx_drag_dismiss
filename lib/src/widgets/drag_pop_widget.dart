@@ -1,5 +1,7 @@
 // ignore_for_file: prefer_typing_uninitialized_variables
 
+import 'package:flutter/rendering.dart';
+
 import '../../fake_wx_drag_dismiss.dart';
 import '../animation_controllers/drag_fade_animation_controller.dart';
 import '../animation_controllers/drag_normal_animation_controller.dart';
@@ -15,15 +17,17 @@ class DragPopWidget extends StatefulWidget {
     required this.child,
     this.onDragStart,
     this.onDragEnd,
+    this.onPanUpdate,
     this.onAnimationFinish,
     required this.animationController,
     required this.fadeAnimationController,
   }) : super(key: key);
-  final Function? onClosing;
+  final Function()? onClosing;
   final Widget child;
-  final Function? onDragStart;
+  final Function()? onDragStart;
+  final ValueChanged<Offset>? onPanUpdate;
   final ValueChanged<Offset>? onDragEnd;
-  final Function? onAnimationFinish;
+  final Function()? onAnimationFinish;
   final AnimationController animationController;
   final AnimationController fadeAnimationController;
   // final ChangeNotifier manualClosingNotifier;
@@ -109,7 +113,7 @@ class DragPopWidgetState extends State<DragPopWidget>
 
   void onPanUpdate(DragUpdateDetails details) {
     _offsetNotifier.value += details.delta;
-
+    widget.onPanUpdate?.call(details.delta);
     if (isChildBelowMid(_offsetNotifier.value.dy)) {
       // dy : sy = x : 1 - min
       _scaleNotifier.value =
@@ -142,6 +146,13 @@ class DragPopWidgetState extends State<DragPopWidget>
     _resetController.forward(from: 0);
   }
 
+  void reset() {
+    _lastScale = 0;
+    _lastOffset = Offset.zero;
+    _lastFade = 0;
+    _resetController.forward(from: 1);
+  }
+
   void onPanCancel() {}
 
   bool isChildBelowMid(double dy) {
@@ -153,6 +164,8 @@ class DragPopWidgetState extends State<DragPopWidget>
     widget.onClosing?.call();
   }
 
+  bool atTopEdge = false;
+  ScrollDirection direction = ScrollDirection.idle;
   @override
   Widget build(BuildContext context) {
     return NotificationListener(
@@ -165,6 +178,14 @@ class DragPopWidgetState extends State<DragPopWidget>
           onPanEnd(notification.details);
         } else if (notification is DragCancelNotification) {
           onPanCancel();
+        } else if (notification is UserScrollNotification && atTopEdge) {
+          direction = notification.direction;
+          if (direction == ScrollDirection.forward) {
+            if (atTopEdge) closing();
+          }
+        } else if (notification is ScrollStartNotification) {
+          atTopEdge = notification.metrics.pixels ==
+              notification.metrics.minScrollExtent;
         }
         return false;
       },

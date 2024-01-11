@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'darg_dismiss_listener.dart';
+import 'drag_dismiss_listener.dart';
 
 class DragDismissManager {
   static final List<DragDismissListener> _listeners = [];
@@ -34,6 +34,12 @@ class DragDismissManager {
   static void sendAnimationFinish() {
     for (var listener in _listeners) {
       listener.onAnimationFinish();
+    }
+  }
+
+  static void sendDragUpdate(Offset delta) {
+    for (var listener in _listeners) {
+      listener.onPanUpdate(delta);
     }
   }
 }

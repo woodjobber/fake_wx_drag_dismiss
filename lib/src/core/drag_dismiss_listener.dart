@@ -8,4 +8,6 @@ abstract class DragDismissListener {
   void onClosing();
 
   void onAnimationFinish();
+
+  void onPanUpdate(Offset delta);
 }

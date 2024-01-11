@@ -1,3 +1,6 @@
+## 0.0.4
+* Fix:
+  1. Support PageView , at top auto dismiss.
 ## 0.0.3
 * First Release:
   1. Fix library name.
